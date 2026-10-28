@@ -1,13 +1,138 @@
-# 🎬 CineMatch - Movie Recommendation System
+<div align="center">
 
-A Streamlit web app that recommends movies from the **MovieLens Small** dataset using four classic
-approaches: popularity, content-based (genres), collaborative filtering (user rating patterns) and a hybrid.
-It was converted from a Jupyter notebook into a normal Python project that runs on Windows in VS Code.
-The Jupyter notebook is **optional** - the app runs without it.
+# 🎬 CineMatch
 
-## Quick start (Windows, VS Code terminal / PowerShell)
+### Movie recommendation system built with Streamlit and MovieLens Small
 
-Open the `CineMatch` folder in VS Code (`File > Open Folder`), open a terminal (`Ctrl+``), then:
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.40%2B-FF4B4B?logo=streamlit&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3%2B-F7931E?logo=scikitlearn&logoColor=white)
+![pandas](https://img.shields.io/badge/pandas-2.x-150458?logo=pandas&logoColor=white)
+![SciPy](https://img.shields.io/badge/SciPy-sparse%20matrices-8CAAE6?logo=scipy&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)
+![Data](https://img.shields.io/badge/data-MovieLens%20Small-green)
+
+</div>
+
+---
+
+## 📖 Overview
+
+CineMatch recommends movies from the **MovieLens Small** dataset using four classic approaches: **popularity**, **content-based** (genres), **collaborative filtering** (rating patterns) and a **hybrid**. It was converted from a Jupyter notebook into a normal Python project that runs in VS Code. The notebook is optional.
+
+> ℹ️ Recommendations start from a **movie**, not a user. None of the models is personalised, and no score is a probability that you will enjoy a movie.
+
+---
+
+## ✨ Features
+
+| Page | What it does |
+|------|--------------|
+| 🏠 **Home** | Branding, dataset statistics, quick recommender, top-rated picks |
+| 🎯 **Recommendations** | Pick a movie, a method and a result count; see score explanations |
+| 🔎 **Explore Movies** | Title search, genre filters (any/all), sorting by popularity, rating, rating count, title or year, pagination |
+| 📊 **Model Insights** | Rating and genre distributions, most/highest-rated movies, on-demand offline evaluation |
+| 📚 **About the Models** | Plain-language comparison table and formulas |
+
+- Friendly setup screen instead of a crash when the dataset is missing
+- Movies identified by `movieId`, so duplicate titles are handled (`[id N]` in the dropdown)
+- Pytest suite using tiny temporary datasets, no internet needed
+
+---
+
+## 🧠 The four models
+
+| Model | File | Idea |
+|-------|------|------|
+| **Popularity** | `src/popularity_model.py` | Weighted rating: `v/(v+m)·R + m/(v+m)·C` |
+| **Content-based** | `src/content_model.py` | Genres → TF-IDF → cosine similarity (genres only) |
+| **Collaborative** | `src/collaborative_model.py` | Sparse movie × user matrix → `NearestNeighbors` (cosine, brute force) |
+| **Hybrid** | `src/hybrid_model.py` | `0.75 · similarity + 0.25 · popularity_normalized` over the 50 most genre-similar movies |
+
+For popularity, `R` is the movie's mean rating, `v` its rating count, `C` the global mean and `m` the 75th percentile of rating counts. Hybrid weights live in `src/config.py`.
+
+```mermaid
+flowchart LR
+    SEL["Selected movie"] --> CB["Content-based<br/>genre TF-IDF + cosine"]
+    SEL --> CF["Collaborative<br/>rating-pattern neighbours"]
+    CB --> TOP["Top 50 genre matches"]
+    POP["Popularity<br/>weighted rating"] --> HY
+    TOP --> HY["Hybrid score<br/>0.75 · similarity + 0.25 · popularity"]
+    CB --> OUT["Ranked recommendations"]
+    CF --> OUT
+    POP --> OUT
+    HY --> OUT
+```
+
+### Cold start
+
+| Method | Movie with no ratings |
+|--------|-----------------------|
+| Popularity | Works (ignores the selected movie except to exclude it) |
+| Content-based | Works (uses genres) |
+| Hybrid | Works (uses genres; popularity part is 0) |
+| Collaborative | **Cannot**; the app says so and does not silently switch method |
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    subgraph UI["ui/ (Streamlit only)"]
+        PG["pages.py"]
+        CO["components.py"]
+        ST["styles.py"]
+    end
+    subgraph SRC["src/ (no Streamlit imports)"]
+        DL["data_loader.py<br/>preprocessing.py"]
+        RE["recommender.py<br/>recommend(method, movie_id, n)"]
+        M["popularity · content<br/>collaborative · hybrid"]
+        AN["analytics.py"]
+        EV["evaluation.py"]
+    end
+    APP{{"app.py<br/>cached engine"}} --> PG
+    PG --> RE
+    PG --> AN
+    PG --> EV
+    APP --> DL
+    DL --> RE
+    RE --> M
+    CSV[("data/*.csv")] --> DL
+```
+
+The engine is built once with `st.cache_resource`; a file-size/mtime signature refreshes the cache when the CSVs change.
+
+---
+
+## 📁 Project structure
+
+```text
+CineMatch/
+├── app.py                       Streamlit entry point
+├── requirements.txt             Runtime dependencies
+├── requirements-dev.txt         + pytest
+├── pytest.ini
+├── .env.example                 Optional: CINEMATCH_DATA_DIR
+├── .streamlit/config.toml       Dark theme
+├── .vscode/                     settings.json, launch.json
+├── data/                        Put the dataset here (see data/README.md)
+├── notebooks/                   Original notebook (optional)
+├── scripts/download_dataset.py  Safe dataset download / unzip helper
+├── src/                         ML and data code
+│   ├── config.py  utils.py  data_loader.py  preprocessing.py
+│   ├── popularity_model.py  content_model.py
+│   ├── collaborative_model.py  hybrid_model.py
+│   ├── recommender.py  analytics.py  evaluation.py
+├── ui/                          styles.py, components.py, pages.py
+└── tests/                       pytest suite
+```
+
+---
+
+## 🚀 Quick start (Windows, VS Code terminal)
+
+Open the `CineMatch` folder in VS Code, open a terminal, then:
 
 ```powershell
 py -m venv .venv
@@ -18,130 +143,89 @@ python scripts/download_dataset.py
 python -m streamlit run app.py
 ```
 
-The app opens at **http://localhost:8501**. Press `Ctrl+C` in the terminal to stop it.
+The app opens at <http://localhost:8501>. Press `Ctrl+C` to stop it.
 
-> The dataset is **not** included. `scripts/download_dataset.py` downloads the official MovieLens Small zip
-> (needs internet once). If you already have the zip (e.g. the notebook's `movie dataset.zip`), use
-> `python scripts/download_dataset.py --zip "C:\path\to\movie dataset.zip"`. See `data/README.md`.
-> If the files are missing the app shows instructions instead of crashing.
+> The dataset is **not** included. `download_dataset.py` fetches the official MovieLens Small zip (internet needed once). If you already have a zip, run:
+> `python scripts/download_dataset.py --zip "C:\path\to\movie dataset.zip"`
 
-### Troubleshooting
+### 🛠️ Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `.venv\Scripts\Activate.ps1 cannot be loaded because running scripts is disabled` | Run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, answer `Y`, activate again. Or use Command Prompt: `.venv\Scripts\activate.bat`. |
-| `py` / `python` is not recognized | Install Python 3.10+ from python.org and tick **"Add python.exe to PATH"**, then reopen the terminal. Try `python -m venv .venv` if `py` is missing. |
-| `pip install` fails | Update pip (`python -m pip install --upgrade pip`), check your internet/proxy, and make sure the venv is active (the prompt starts with `(.venv)`). Use a 64-bit Python 3.10-3.13. |
-| App says the dataset is missing | Run `python scripts/download_dataset.py` (or `--zip ...`), then refresh the browser page. |
-| `streamlit` is not recognized | Always start it with `python -m streamlit run app.py`. |
-| Port 8501 already in use | `python -m streamlit run app.py --server.port 8502` |
-| `download_dataset.py` cannot download | Download `ml-latest-small.zip` manually from https://grouplens.org/datasets/movielens/latest/ and use the `--zip` option. |
+| `Activate.ps1 cannot be loaded because running scripts is disabled` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, answer `Y`, activate again. Or use `.venv\Scripts\activate.bat` in Command Prompt. |
+| `py` / `python` not recognized | Install Python 3.10+ from python.org with **Add python.exe to PATH**, then reopen the terminal. |
+| `pip install` fails | Update pip, check internet/proxy, make sure the venv is active (`(.venv)` in the prompt). Use 64-bit Python 3.10–3.13. |
+| App says dataset is missing | Run `python scripts/download_dataset.py` (or `--zip ...`), then refresh the page. |
+| `streamlit` not recognized | Start it with `python -m streamlit run app.py`. |
+| Port 8501 in use | `python -m streamlit run app.py --server.port 8502` |
+| Download script cannot download | Get `ml-latest-small.zip` from <https://grouplens.org/datasets/movielens/latest/> and use `--zip`. |
 
-## Pages
+---
 
-1. **Home** - branding, dataset statistics, quick recommender and top-rated picks.
-2. **Recommendations** - choose a movie, a method and how many results; score explanations.
-3. **Explore Movies** - title search, genre filters (any/all), sorting by popularity, rating, rating count, title or year, and pagination.
-4. **Model Insights** - totals, rating distribution, genre distribution, most-rated and highest-rated movies (with a minimum-ratings slider), and an on-demand offline evaluation. All numbers are computed from the loaded dataset.
-5. **About the Models** - plain-language comparison table and the formulas.
-
-## The four models
-
-| Model | File | Idea |
-|---|---|---|
-| Popularity | `src/popularity_model.py` | `weighted = v/(v+m)·R + m/(v+m)·C` (R = movie mean rating, v = its rating count, C = global mean, m = 75th percentile of rating counts) |
-| Content-based | `src/content_model.py` | Genre strings → TF-IDF vectors → cosine similarity to the selected movie. **Genres only** - no plots, actors or directors exist in the data. |
-| Collaborative | `src/collaborative_model.py` | Sparse movie × user rating matrix → scikit-learn `NearestNeighbors` (cosine, brute force) → movies with similar rating patterns |
-| Hybrid | `src/hybrid_model.py` | `hybrid_score = 0.75 · similarity + 0.25 · popularity_normalized`, applied to the 50 most genre-similar movies. `popularity_normalized` = weighted score ÷ highest weighted score in the dataset (0 for unrated movies). Weights live in `src/config.py`. |
-
-**Reading the scores:** a similarity score (0-1) says how alike two movies are (by genre or by who rated them);
-a popularity score is a weighted star rating; the hybrid score only ranks candidates against each other.
-**None is a probability that you will enjoy a movie.** None of the models is personalised to a user.
-
-**Cold start:** Content-based and Hybrid work for movies without ratings (they use genres). Collaborative
-filtering cannot - the app tells you so and does **not** silently switch to another method.
-Popularity ignores the selected movie except to leave it out of the list.
-
-## Project structure
-
-```
-CineMatch/
-├── app.py                     Streamlit entry point (page routing, cached model loading)
-├── requirements.txt           Runtime dependencies
-├── requirements-dev.txt       + pytest (and optional notebook packages, commented out)
-├── pytest.ini                 Test configuration
-├── .env.example               Optional settings (CINEMATCH_DATA_DIR)
-├── .gitignore
-├── .streamlit/config.toml     Dark theme
-├── .vscode/                   settings.json, launch.json (run app / evaluation / tests)
-├── data/                      Put the dataset here (see data/README.md)
-├── notebooks/                 Original notebook (optional, for reference)
-├── scripts/download_dataset.py  Safe dataset download / unzip helper
-├── src/                       ML and data code - no Streamlit imports
-│   ├── config.py              Paths, constants, weights
-│   ├── utils.py               Exceptions and small helpers
-│   ├── data_loader.py         Validation + loading of the CSV files
-│   ├── preprocessing.py       Cleaning
-│   ├── popularity_model.py  content_model.py  collaborative_model.py  hybrid_model.py
-│   ├── recommender.py         Builds all models; one `recommend(method, movie_id, n)` call
-│   ├── analytics.py           Statistics and catalogue filtering for the UI
-│   └── evaluation.py          Offline evaluation (RMSE, Precision/Recall@10)
-├── ui/                        Streamlit UI only: styles.py, components.py, pages.py
-└── tests/                     pytest suite (uses tiny temporary datasets, no internet)
-```
-
-Differences from the suggested layout: added `src/recommender.py`, `src/analytics.py`, the `ui/` package,
-`pytest.ini`, `.streamlit/config.toml` and `tests/test_evaluation.py`, `test_download_script.py`, `test_app_smoke.py`.
-
-## Running the tests
+## 🧪 Tests and evaluation
 
 ```powershell
 python -m pip install -r requirements-dev.txt
-python -m pytest -q
+python -m pytest -q          # test suite
+python -m src.evaluation     # offline evaluation (or use the button on Model Insights)
 ```
 
-Tests use small in-memory / temporary datasets and cover valid and invalid selections, count boundaries,
-excluding the selected movie, duplicate prevention, missing/malformed/empty files, missing columns,
-unrated movies, sparse data, the hybrid formula, ID/order consistency, the dataset zip helper, the
-evaluation functions, and starting the Streamlit app (every page) headlessly.
+Tests cover valid/invalid selections, count boundaries, excluding the selected movie, duplicate prevention, missing/malformed/empty files, missing columns, unrated movies, sparse data, the hybrid formula, ID/order consistency, the download helper, evaluation functions, and a headless smoke start of every page.
 
-## Evaluation
+| Evaluation | What it measures |
+|------------|------------------|
+| **RMSE** | Item-based collaborative-filtering *rating prediction*; 80/20 split, seed 42, up to 3,000 test ratings (same method as the notebook) |
+| **Precision@10 / Recall@10** | **Popularity baseline only**; does **not** evaluate content-based, collaborative or hybrid |
 
-```powershell
-python -m src.evaluation
-```
-(or use the **Run evaluation** button on the Model Insights page). It reports:
+Precision/Recall@10 is reported two ways: *Original* (notebook: popularity from all ratings including test data, first 100 users) and *Improved* (popularity from training ratings only, already-rated movies skipped, all users with a relevant held-out movie).
 
-* **RMSE** of item-based collaborative-filtering *rating prediction* (80/20 split, seed 42, up to 3,000 test ratings) - same method as the notebook.
-* **Precision@10 / Recall@10 of the popularity baseline only.** These do **not** evaluate the content-based, collaborative or hybrid recommenders.
-  * *Original* (notebook): popularity list from **all** ratings (includes test data), first 100 users.
-  * *Improved* (new): popularity from **training** ratings only, movies a user already rated in training are skipped, all users with a relevant held-out movie.
+---
 
-## Changes from the notebook
+## 🔄 Changes from the notebook
 
 The algorithms and formulas are unchanged. Material implementation differences:
 
-1. **Sparse throughout:** the collaborative matrix is built directly as a sparse matrix; the notebook built a dense `pivot_table` first. Matrix values are the same.
-2. **Content similarity** is computed for the selected movie only (as the notebook's own `app.py` did) instead of a full N × N matrix. Cosine values are the same. **Ties** (very common with genre-only data) are broken by catalogue order, so results are deterministic; the notebook's tie order came from `np.argsort(...)[::-1]`.
-3. **Movies are identified by `movieId`**, so duplicate titles are handled (the notebook looked up by title and took the first match). Duplicate titles get `[id N]` in the dropdown.
-4. **Hybrid / popularity ties** use stable sorting (popularity ties by `movieId`).
-5. **Extra display only:** collaborative results show cosine similarity (1 − distance); the notebook returned no score.
-6. **Cleaning** additionally coerces ids/ratings to numbers and drops unparsable rows; `year` is parsed from the title.
-7. `n_jobs=-1` was dropped from `NearestNeighbors`. The notebook's 3-method demo `app.py` is replaced by the 5-page app.
-8. **Evaluation** was refactored into `src/evaluation.py` (same logic, no dense matrix, neighbour caching); the improved ranking evaluation is new and labelled as such.
+1. Collaborative matrix is built **sparse** directly (the notebook built a dense pivot first); values are the same.
+2. Content similarity is computed for the **selected movie only**; ties are broken by catalogue order, so results are deterministic.
+3. Movies are identified by **`movieId`**, not title.
+4. Hybrid and popularity ties use **stable sorting**.
+5. Collaborative results additionally show cosine similarity (1 − distance).
+6. Cleaning coerces ids/ratings to numbers, drops unparsable rows, and parses `year` from the title.
+7. `n_jobs=-1` dropped from `NearestNeighbors`; the notebook's 3-method demo app is replaced by the 5-page app.
+8. Evaluation refactored into `src/evaluation.py`; the improved ranking evaluation is new and labelled as such.
 
-I could not run the original notebook on the real dataset, so identical numbers (e.g. the exact RMSE) between notebook and project are **not** verified.
+> The original notebook could not be run on the real dataset, so identical numbers (e.g. exact RMSE) between notebook and project are **not verified**.
 
-## Known limitations
+---
 
-* No movie posters (the dataset has none); no external API is used.
-* The hybrid model re-ranks only the top 50 genre matches (as in the notebook). Because many movies share identical genres, that pool can contain arbitrary-but-equal candidates.
-* Recommendations start from a movie; there are no user accounts or personalised profiles.
-* MovieLens Small is small (~100k ratings), so collaborative results for rarely rated movies are weak.
-* Built and tested (on Linux, Python 3.12) with streamlit 1.66.1, pandas 3.1.0, numpy 2.5.4, scikit-learn 1.9.1, scipy 1.18.1, altair 6.3.0; not run on Windows by me. The minimum versions in `requirements.txt` were not individually tested.
+## ⚠️ Known limitations
 
-## Optional: the notebook
+- No movie posters (the dataset has none); no external API is used.
+- Hybrid re-ranks only the top 50 genre matches; many movies share identical genres, so that pool can contain arbitrary-but-equal candidates.
+- No user accounts or personalised profiles.
+- MovieLens Small has about 100k ratings, so collaborative results for rarely rated movies are weak.
+- Built and tested on Linux with Python 3.12 (streamlit 1.66.1, pandas 3.1.0, numpy 2.5.4, scikit-learn 1.9.1, scipy 1.18.1, altair 6.3.0). **Not run on Windows**, and the minimum versions in `requirements.txt` were not individually tested.
 
-`notebooks/Movie Recomendation Code (1).ipynb` is the original development notebook, kept for reference.
-It expects `data/movie dataset.zip`, contains Jupyter-only commands (`%%writefile`, `%pip`) and needs
-`jupyter`, `matplotlib` and `seaborn` (see `requirements-dev.txt`). The app does not use it.
+---
+
+## 📸 Screenshots
+
+Add images after running the app, e.g. under `docs/screenshots/`:
+
+| Home | Recommendations | Explore | Model Insights |
+|:--:|:--:|:--:|:--:|
+| _add image_ | _add image_ | _add image_ | _add image_ |
+
+---
+
+## 📓 Optional: the notebook
+
+`notebooks/Movie Recomendation Code (1).ipynb` is the original development notebook. It expects `data/movie dataset.zip`, uses Jupyter-only commands (`%%writefile`, `%pip`) and needs `jupyter`, `matplotlib` and `seaborn`. The app does not use it.
+
+---
+
+<div align="center">
+
+Data: MovieLens Small (GroupLens) · Built with Python, pandas, scikit-learn and Streamlit
+
+</div>
