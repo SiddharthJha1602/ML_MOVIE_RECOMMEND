@@ -1,0 +1,9 @@
+# Development / testing extras
+-r requirements.txt
+pytest>=7.0
+
+# Only needed if you want to open the original notebook in notebooks/
+# (uncomment, then: python -m pip install -r requirements-dev.txt)
+# jupyter
+# matplotlib
+# seaborn
